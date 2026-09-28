@@ -33,7 +33,13 @@ For this lab to be marked complete, the following criteria must be met:
 Before you get started, you'll need to load the following packages: `tidyverse`, `terra`, `sf`, and `tmap`. You may also want to use `knitr` for displaying tables.
 
 ```{r packages}
-# Load packages here.
+install.packages(c("tidyverse", "terra", "sf", "tmap", "knitr"))
+library(tidyverse)
+library(terra)
+library(sf)
+library(tmap)
+library(knitr)
+
 ```
 
 # Part 1: Mapping the distribution of trees
@@ -51,7 +57,14 @@ Your first task is to load these observations and convert them into a spatial po
 **Load the iNaturalist observations and convert them to an `sf` point dataset using the longitude and latitude fields. Map the observations using `tmap`, with the point colors based on the `gentype` field.**
 
 ```{r task1}
-# Code goes here.
+Cty_Data<-st_read("data/ACSCtyData_2022ACS_simplify.gpkg")
+
+GA_Trees<-read_csv("data/gatree_obs_inat.csv") %>%
+  st_as_sf(coords = c("longitude", "latitude"), 
+           crs = 4326,
+           remove = FALSE)
+
+tmapShape()
 ```
 
 ---
