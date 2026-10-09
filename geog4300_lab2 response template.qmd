@@ -9,6 +9,8 @@ format:
 knitr::opts_chunk$set(echo = TRUE)
 ```
 
+Mary Elizabeth Rudd
+
 # Spatial statistics with vector and raster data
 
 **Overview:**
@@ -64,7 +66,10 @@ GA_Trees<-read_csv("data/gatree_obs_inat.csv") %>%
            crs = 4326,
            remove = FALSE)
 
-tmapShape()
+tm_shape(GA_Trees) + 
+  tm_dots("gentype",size=0.1) +
+  tm_compass() +
+  tm_scalebar(position = c("left", "bottom")) 
 ```
 
 ---
@@ -82,7 +87,20 @@ You'll then use a spatial join to determine which county contains each tree obse
 **Load the Georgia county dataset and use a spatial join to assign each tree observation to a county. Create a table showing the number of observations of each species in each county.**
 
 ```{r task2}
-# Code goes here.
+GA_Cty<-Cty_Data %>%
+  filter(st_name == "Georgia")
+
+GA_Trees <- st_join(GA_Trees, GA_Cty %>% select(county = cty_name), join = st_within)
+
+Species_Count <- GA_Trees %>%
+  st_drop_geometry() %>%
+  count(county, gentype) %>%
+   pivot_wider(
+    names_from = gentype,
+    values_from = n,
+    values_fill = 0
+  )
+
 ```
 
 You should now have a dataset showing the number of observations of each species in each county.
@@ -102,7 +120,8 @@ Your next step is to calculate the **total number of tree observations** in each
 **Create a county-level dataset containing the number of observations of each species and the total number of tree observations.**
 
 ```{r task3}
-# Code goes here.
+Species_Count<-Species_Count %>%
+  mutate(total_trees = rowSums(across(-county)))
 ```
 
 ## Calculating a location quotient
@@ -120,7 +139,27 @@ First, calculate the statewide proportion of observations that are live oak. The
 **Calculate the location quotient for live oak observations for every Georgia county. Add the resulting LQ as a new variable in your county dataset.**
 
 ```{r task4}
-# Code goes here.
+Species_Count <- Species_Count %>%
+  mutate(state_oak_pct=sum(`Live oak`)/sum(total_trees),
+    county_oak_pct=`Live oak`/total_trees,
+    live_oak_LQ=county_oak_pct/state_oak_pct)
+
+Species_Count <- Species_Count %>%
+mutate(state_pecan_pct=sum(`Pecan`)/sum(total_trees),
+    county_pecan_pct=`Pecan`/total_trees,
+    Pecan_LQ=county_pecan_pct/state_pecan_pct)
+
+Species_Count <- Species_Count %>%
+mutate(state_dogwood_pct=sum(`Dogwood`)/sum(total_trees),
+    county_dogwood_pct=`Dogwood`/total_trees,
+    Dogwood_LQ=county_dogwood_pct/state_dogwood_pct)
+
+Species_Count <- Species_Count %>%
+mutate(state_rhod_pct=sum(`Rhododendron`)/sum(total_trees),
+    county_rhod_pct=`Rhododendron`/total_trees,
+    Rhod_LQ=county_rhod_pct/state_rhod_pct)
+
+
 ```
 
 Now map your LQ values.
@@ -130,12 +169,48 @@ Now map your LQ values.
 **Create a map showing the location quotient for live oak observations. Describe the geographic pattern you see. Which parts of Georgia have relatively high concentrations of live oak observations? Which have relatively low concentrations?**
 
 ```{r task5_map}
-# Code goes here.
+GA_LQ <- GA_Cty %>%
+  left_join(Species_Count, by = c("cty_name" = "county"))
+
+tm_shape(GA_LQ) +
+  tm_polygons(
+    fill = "live_oak_LQ",
+    fill.legend = tm_legend(title = "Live oak LQ")) +
+  tm_title("Location Quotient of Live Oak Observations in Georgia") +
+  tm_compass() +
+  tm_scalebar(position = c("left", "bottom"))
+
+tm_shape(GA_LQ) +
+  tm_polygons(
+    fill = "Dogwood_LQ",
+    fill.legend = tm_legend(title = "Dogwood LQ")) +
+  tm_title("Location Quotient of Dogwood Observations in Georgia") +
+  tm_compass() +
+  tm_scalebar(position = c("left", "bottom"))
+
+tm_shape(GA_LQ) +
+  tm_polygons(
+    fill = "Rhod_LQ",
+    fill.legend = tm_legend(title = "Rhododendron LQ")) +
+  tm_title("Location Quotient of Rhododendron Observations in Georgia") +
+  tm_compass() +
+  tm_scalebar(position = c("left", "bottom"))
+
+tm_shape(GA_LQ) +
+  tm_polygons(
+    fill = "Pecan_LQ",
+    fill.legend = tm_legend(title = "Pecan LQ")) +
+  tm_title("Location Quotient of Pecan Observations in Georgia") +
+  tm_compass() +
+  tm_scalebar(position = c("left", "bottom"))
+
+
+
 ```
 
 **Your response:**
 
-{Your response goes here.}
+Southeast Georgia especially seems to have relatively high concentrations of live oak observations. Most of north Georgia has relatively low concentrations, but they continue to get higher especially going east and south. The concentrations seemed centered around Savannah, Brunswick, and the Okefenokee National Wildlife Refuge.
 
 # Part 2: Trees and temperature in Georgia
 
@@ -156,7 +231,10 @@ You should see this raster in the data folder of this lab repository. Load it us
 **Load the July 1, 2024 temperature raster and convert it from Kelvin to Celsius. Plot it when you are done.**
 
 ```{r task6}
-# Code goes here.
+Temp_July_1<-rast("data/temp_july2022_2024/temperature_2m_2024-07-01.tif")
+
+Temp_July_1_C<-Temp_July_1-273.15
+plot(Temp_July_1_C)
 ```
 
 Now load **all of the temperature rasters for July 2022–2024**.
@@ -170,9 +248,14 @@ Use `nlyr()` to confirm how many raster layers you have loaded.
 **Load all temperature rasters for July dates in 2022–2024, convert them from Kelvin to Celsius, and calculate the mean temperature across all of the raster layers.**
 
 ```{r task7}
-# Code goes here.
-```
+Temp_List <- list.files(path = "data/temp_july2022_2024", pattern = "\\.tif$", full.names = TRUE)
+Temperature_Rasters <- rast(Temp_List)-273.15
+Mean_Temp <- mean(Temperature_Rasters)
+plot(Mean_Temp)
 
+nlyr(Temperature_Rasters)
+
+```
 You now have a raster representing the mean July temperature across the study period.
 
 Next, use `terra::extract()` to obtain the temperature value at the location of every tree observation.
@@ -182,7 +265,13 @@ Next, use `terra::extract()` to obtain the temperature value at the location of 
 **Extract the mean July temperature for each tree observation and add the temperature value to the tree dataset. Display the first several observations using `kable()`.**
 
 ```{r task8}
-# Code goes here.
+July_Tree_Temps <- terra::extract(Mean_Temp, GA_Trees)
+GA_Trees$mean_temp <- July_Tree_Temps[[2]]  
+
+GA_Trees %>%
+  st_drop_geometry() %>%
+  head() %>%
+  kable()
 ```
 
 You can now calculate summary statistics for the two tree species.
@@ -201,16 +290,23 @@ The mean longitude and latitude provide a simple measure of the **mean center** 
 **Calculate the mean and standard deviation of temperature for each species, along with the mean longitude and latitude of their observations. Display the results using `kable()`.**
 
 ```{r task9}
-# Code goes here.
+GA_Trees%>%
+  group_by(gentype) %>%
+  summarize(
+    avg_temp = mean(mean_temp, na.rm = TRUE),
+    sd_temp = sd(mean_temp, na.rm = TRUE),
+    mean_longitude = mean(longitude, na.rm = TRUE),
+    mean_latitude = mean(latitude, na.rm = TRUE)
+  ) %>%
+  kable()
+
 ```
 
 ### Task 10
 
 **What does the table tell you about the temperatures associated with observations of the two species? How do their geographic distributions compare? Are there any similarities or differences that you find interesting?**
 
-**Your response:**
-
-{Your response goes here.}
+In just looking at the live oak temperatures, we can see that the mean average July temperature is higher than the other species. This may be consistent with where the concentration of live oaks occur, being in the southeast part of the state. I went back and ran numbers and visualizations for the other species, and I found it very interesting that the Dogwoods and Rhododendrons had pretty much the same extent in northwestern Georgia, but had different mean average temperatures. I also find it interesting that Pecans have a more similar temperature to Dogwoods, yet the counties with the highest relative concentration of Pecans were in the middle of the state. But when you compare the mean average latitudes rather than geographical extent on the maps that I looked at, the similarities in temperature between Pecans and Dogwoods makes sense even though on paper they are concentrated in different areas of the state. 
 
 # Lab challenge
 
@@ -220,8 +316,35 @@ As a challenge, repeat the temperature analysis using the 1950–52 data. Calcul
 
 **Challenge:** _Which areas of Georgia show the largest changes in the temperatures associated with tree observations? Which trees are in areas with the greatest changes in temperature in this period?_
 
+I found that the largest increases in July temperature were associated with Rhododendrons (increase of 0.77°C, from 23.61°C to 24.38°C) and live oaks (increase of 0.72°C, from 27.14°C to 27.87°C). Dogwoods (+0.44°C) and pecans (+0.41°C) warmed by about half as much. It is interesting that the two species with the biggest increases are each at opposite ends of the state. Rhododendrons have a mean latitude of 34.7, while live oaks have a mean latitude of 31.6. Temperature standard deviations increased for live oaks and pecans but decreased for Dogwoods and Rhododendrons, meaning the spread in July temperature among Dogwood and Rhododendron sites got smaller, while the spread among live oak and pecan sites got larger.
+
+
 ```{r challenge}
-# Start your code here.
+Temp_List_2 <- list.files(path = "data/temp_july1950_1952", pattern = "\\.tif$", full.names = TRUE)
+Temperature_Rasters_2 <- rast(Temp_List_2)-273.15
+Mean_Temp50_52 <- mean(Temperature_Rasters_2)
+plot(Mean_Temp50_52)
+
+
+July_Tree_Temps_50_52 <- terra::extract(Mean_Temp50_52, GA_Trees)
+GA_Trees$mean_temp <- July_Tree_Temps_50_52[[2]]  
+
+GA_Trees %>%
+  st_drop_geometry() %>%
+  head() %>%
+  kable()
+
+
+GA_Trees%>%
+  group_by(gentype) %>%
+  summarize(
+    avg_temp = mean(mean_temp, na.rm = TRUE),
+    sd_temp = sd(mean_temp, na.rm = TRUE),
+    mean_longitude = mean(longitude, na.rm = TRUE),
+    mean_latitude = mean(latitude, na.rm = TRUE)
+  ) %>%
+  kable()
+
 ```
 
 # Final submission
@@ -230,10 +353,10 @@ As a challenge, repeat the temperature analysis using the 1950–52 data. Calcul
 
 Besides class materials, what other sources of assistance did you use while completing this lab? These can include input from classmates, relevant material identified through web searches (e.g., Stack Overflow), or assistance from ChatGPT or other AI tools. How did these sources support your own learning in completing the lab?
 
-{Response here.}
+Besides referencing class notes and scripts, I received input from classmate Camryn regarding the presence of NA tree/county values, I frequently references the second edition of R For Data Science (https://r4ds.hadley.nz/), a well as the cheat sheets for terra, sf, and tmap (https://rspatial.org/_static/terra_cheatsheet.html, https://rstudio.github.io/cheatsheets/sf.pdf, and https://jtr13.github.io/cc22spring/tmap-package.html). Additionally, I was having issues with an accidental naming issue that caused my grouping in 9 to be all wonky, resulting in NA values for all the standard deviation values. In that instance I did consult Gemini, which was not helpful whatsoever, but Claude proved much more helpful at identifying the problem. I also was not sure how to open multiple files at once in task 7, and I used an internet search for that in which I did use the answer that Gemini gave me first. The only things I felt really enhanced my learning during this lab were the online textbooks and cheat sheets and the occasional Google search with a specific problem. I do appreciate that when I am having trouble with troubleshooting my code, I can get an in depth explanation from an AI about what I did wrong and what to do in the future. 
 
 ## Lab reflection
 
 How do you feel about the work you did on this lab? Was it easy, moderate, or hard? What are the biggest things you learned by completing it?
 
-{Your response here}
+I think these labs are definitely getting harder! I definitely felt like for me this one was moderately difficult. Something this lab really tested me on was just my retention from our previous scripts, I had to do a lot of referencing because I knew what I wanted to do but couldn't remember the exact language or functions I needed. I would like to move away from needing to reference something else if I can help it so I'm going to challenege myself with that in our next lab for sure. 
